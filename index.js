@@ -22,6 +22,15 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Responder preflight OPTIONS
 
+// Tus rutas aquí
+app.get('/', (req, res) => {
+  res.send('Servidor funcionando 🚀');
+});
+
+// ejemplo de login
+app.post('/api/login', (req, res) => {
+  res.json({ message: 'Login funcionando ✅' });
+});
 
 // DB Pool
 const pool = mysql.createPool({
