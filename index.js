@@ -9,28 +9,29 @@ import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 const app = express();
-app.use(express.json());
-// ---------------------
-// CORS
-// ---------------------
-const corsOptions = {
-  origin: process.env.CLIENT_URL, // tu frontend en Vercel
+const allowedOrigin = 'https://landingpage-3hlz.vercel.app';
+
+app.use(cors({
+  origin: allowedOrigin,           // permite solo tu frontend
   methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true                // si usas cookies o token en headers
+}));
+
+// Esto responde a cualquier preflight OPTIONS
+app.options('*', cors({
+  origin: allowedOrigin,
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
-};
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Responder preflight OPTIONS
+}));
 
-// Tus rutas aquí
-app.get('/', (req, res) => {
-  res.send('Servidor funcionando 🚀');
-});
+app.use(express.json());
 
-// ejemplo de login
-app.post('/api/login', (req, res) => {
-  res.json({ message: 'Login funcionando ✅' });
-});
+// Rutas
+app.post('/api/login', (req, res) => res.json({ ok: true }));
+app.post('/api/google-login', (req, res) => res.json({ ok: true }));
+app.post('/api/register', (req, res) => res.json({ ok: true }));
 
 // DB Pool
 const pool = mysql.createPool({
