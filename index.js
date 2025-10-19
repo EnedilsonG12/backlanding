@@ -21,6 +21,10 @@ const pool = mysql.createPool({
   connectionLimit: 10
 });
 
+app.get('/', (req, res) => {
+  res.send('Servidor Railway funcionando 🚀');
+});
+
 // Google OAuth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
