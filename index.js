@@ -10,31 +10,28 @@ import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 const app = express();
 // ---------------------
-// CORS simplificado y seguro
+// CORS universal para Vercel + localhost
 // ---------------------
 const allowedOrigins = [
   'https://landingpage-3hlz.vercel.app',
   'http://localhost:5173'
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Permitir solicitudes sin origin (ej: Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'El CORS no está permitido para este origen.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204); // Responde al preflight
+  }
+  next();
+});
 
-// Permitir preflight OPTIONS
-app.options('*', cors());
-
+app.use(express.json());
 app.use(express.json());
 
 // DB Pool
