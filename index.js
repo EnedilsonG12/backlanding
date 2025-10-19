@@ -9,6 +9,13 @@ import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 const app = express();
+
+// ---------------------
+// Middleware JSON
+// ---------------------
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // ---------------------
 // CORS universal
 // ---------------------
@@ -33,7 +40,7 @@ app.use((req, res, next) => {
 // DB Pool (Railway interno)
 // ---------------------
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || "mysql.railway.internal",
+  host: process.env.DB_HOST,
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
@@ -41,14 +48,14 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
-// Test de conexión al iniciar
+// Test de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
-    console.log("✅ Conectado a la base de datos MySQL");
+    console.log("✅ Conectado a MySQL");
     conn.release();
   } catch (err) {
-    console.error("❌ Error conectando a la base de datos MySQL:", err);
+    console.error("❌ Error conectando a MySQL:", err);
   }
 })();
 
@@ -88,25 +95,13 @@ app.post('/api/register', async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      console.log("❌ Datos incompletos:", req.body);
-      return res.status(400).json({ error: "Email y contraseña son requeridos" });
-    }
+    if (!email || !password) return res.status(400).json({ error: "Email y contraseña son requeridos" });
 
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-
-    if (!rows.length) {
-      console.log("❌ Usuario no encontrado:", email);
-      return res.status(401).json({ error: "Usuario no encontrado" });
-    }
+    if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
 
     const user = rows[0];
-    console.log("Usuario encontrado:", user.email);
-
     const validPassword = await bcrypt.compare(password, user.password);
-    console.log("Contraseña válida:", validPassword);
-
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
     const token = jwt.sign(
@@ -115,9 +110,7 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    console.log("✅ Login exitoso:", user.email);
     res.json({ token, role: user.role });
-
   } catch (err) {
     console.error("❌ Error en /api/login:", err);
     res.status(500).json({ error: "Error interno del servidor" });
