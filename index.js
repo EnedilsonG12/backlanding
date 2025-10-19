@@ -46,7 +46,9 @@ app.get('/', (req, res) => {
   res.send('Servidor Railway funcionando 🚀');
 });
 
+// ---------------------
 // Google OAuth Client
+// ---------------------
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------------
@@ -69,7 +71,7 @@ app.post('/api/register', async (req, res) => {
 
     res.json({ id: result.insertId, username, role: role || 'user' });
   } catch (err) {
-    console.error('❌ Error en /api/register:', err.message);
+    console.error(err);
     res.status(500).json({ error: 'Error al registrar usuario' });
   }
 });
@@ -85,11 +87,11 @@ app.post("/api/login", async (req, res) => {
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
 
-    const user = rows[0]; // ✅ Declaramos user primero
+    const user = rows[0]; // ✅ Declaramos user antes de usarlo
     console.log("Usuario encontrado:", user.email);
-    console.log("Comparación contraseña:", await bcrypt.compare(password, user.password));
 
     const validPassword = await bcrypt.compare(password, user.password);
+    console.log("Comparación contraseña:", validPassword);
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
     const secret = process.env.JWT_SECRET || "clave_default";
