@@ -10,7 +10,9 @@ import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: process.env.CLIENT_URL }));
+app.use(cors({ origin: process.env.CLIENT_URL,
+  credentials: true
+ }));
 
 // DB Pool
 const pool = mysql.createPool({
