@@ -10,33 +10,30 @@ import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 const app = express();
 // ---------------------
-// Configuración CORS
+// CORS simplificado y seguro
 // ---------------------
 const allowedOrigins = [
-  'https://landingpage-3hlz.vercel.app', // Frontend en Vercel
-  'http://localhost:5173'                 // Desarrollo local
+  'https://landingpage-3hlz.vercel.app',
+  'http://localhost:5173'
 ];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('No permitido por CORS'));
+  origin: function (origin, callback) {
+    // Permitir solicitudes sin origin (ej: Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'El CORS no está permitido para este origen.';
+      return callback(new Error(msg), false);
     }
+    return callback(null, true);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
 
-// Responder preflight OPTIONS
-app.options('*', cors({
-  origin: allowedOrigins,
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
+// Permitir preflight OPTIONS
+app.options('*', cors());
 
 app.use(express.json());
 
