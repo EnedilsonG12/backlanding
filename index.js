@@ -10,9 +10,11 @@ import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: process.env.CLIENT_URL,
-  credentials: true
- }));
+app.use(cors({
+  origin: process.env.CLIENT_URL, // la URL de tu frontend en Vercel
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"], // opcional pero recomendado
+  credentials: true // para cookies o headers de autenticación
+}));
 
 // DB Pool
 const pool = mysql.createPool({
