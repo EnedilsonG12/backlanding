@@ -41,6 +41,20 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   connectionLimit: 10,
 });
+// ---------------------
+// log de conexión
+pool.getConnection()
+  .then(conn => {
+    console.log('✅ Conectado a la base de datos MySQL');
+    conn.release();
+  })
+  .catch(err => {
+    console.error('❌ Error conectando a la base de datos MySQL:', err);
+  });
+
+// ---------------------
+// Ruta de prueba
+// ---------------------
 
 app.get('/', (req, res) => {
   res.send('Servidor Railway funcionando 🚀');
