@@ -9,29 +9,36 @@ import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 const app = express();
-const allowedOrigin = 'https://landingpage-3hlz.vercel.app';
+// ---------------------
+// Configuración CORS
+// ---------------------
+const allowedOrigins = [
+  'https://landingpage-3hlz.vercel.app', // Frontend en Vercel
+  'http://localhost:5173'                 // Desarrollo local
+];
 
 app.use(cors({
-  origin: allowedOrigin,           // permite solo tu frontend
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true                // si usas cookies o token en headers
+  credentials: true
 }));
 
-// Esto responde a cualquier preflight OPTIONS
+// Responder preflight OPTIONS
 app.options('*', cors({
-  origin: allowedOrigin,
+  origin: allowedOrigins,
   methods: ["GET","POST","PUT","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
 
 app.use(express.json());
-
-// Rutas
-app.post('/api/login', (req, res) => res.json({ ok: true }));
-app.post('/api/google-login', (req, res) => res.json({ ok: true }));
-app.post('/api/register', (req, res) => res.json({ ok: true }));
 
 // DB Pool
 const pool = mysql.createPool({
