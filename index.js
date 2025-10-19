@@ -38,7 +38,8 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
-  connectionLimit: 10
+  connectionLimit: 10,
+  port: 3306
 });
 
 app.get('/', (req, res) => {
@@ -68,18 +69,8 @@ app.post('/api/register', async (req, res) => {
 
     res.json({ id: result.insertId, username, role: role || 'user' });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error en /api/register:', err.message);
     res.status(500).json({ error: 'Error al registrar usuario' });
-  }
-});
-
-app.get('/api/users', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT id, username, email, role FROM users');
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error obteniendo usuarios' });
   }
 });
 
@@ -94,10 +85,10 @@ app.post("/api/login", async (req, res) => {
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
 
+    const user = rows[0]; // ✅ Declaramos user primero
     console.log("Usuario encontrado:", user.email);
     console.log("Comparación contraseña:", await bcrypt.compare(password, user.password));
 
-    const user = rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
@@ -153,8 +144,18 @@ app.post('/api/google-login', async (req, res) => {
 
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
-    console.error('Error login Google:', err);
+    console.error('❌ Error login Google:', err.message);
     res.status(400).json({ error: 'Token de Google inválido' });
+  }
+});
+
+app.get('/api/users', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, username, email, role FROM users');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error obteniendo usuarios' });
   }
 });
 
