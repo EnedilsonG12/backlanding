@@ -30,8 +30,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-app.use(express.json());
 app.use(express.json());
 
 // DB Pool
@@ -95,6 +93,9 @@ app.post("/api/login", async (req, res) => {
 
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
+
+    console.log("Usuario encontrado:", user.email);
+    console.log("Comparación contraseña:", await bcrypt.compare(password, user.password));
 
     const user = rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
