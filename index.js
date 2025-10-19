@@ -10,7 +10,7 @@ import { OAuth2Client } from 'google-auth-library';
 dotenv.config();
 const app = express();
 // ---------------------
-// CORS universal para Vercel + localhost
+// CORS universal
 // ---------------------
 const allowedOrigins = [
   'https://landingpage-3hlz.vercel.app',
@@ -25,40 +25,32 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204); // Responde al preflight
-  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.use(express.json());
 
-// DB Pool
+// ---------------------
+// DB Pool (Railway interno)
+// ---------------------
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
+  host: process.env.DB_HOST || "mysql.railway.internal",
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   connectionLimit: 10,
 });
-// ---------------------
-// log de conexión
-pool.getConnection()
-  .then(conn => {
-    console.log('✅ Conectado a la base de datos MySQL');
+
+// Test de conexión al iniciar
+(async () => {
+  try {
+    const conn = await pool.getConnection();
+    console.log("✅ Conectado a la base de datos MySQL");
     conn.release();
-  })
-  .catch(err => {
-    console.error('❌ Error conectando a la base de datos MySQL:', err);
-  });
-
-// ---------------------
-// Ruta de prueba
-// ---------------------
-
-app.get('/', (req, res) => {
-  res.send('Servidor Railway funcionando 🚀');
-});
+  } catch (err) {
+    console.error("❌ Error conectando a la base de datos MySQL:", err);
+  }
+})();
 
 // ---------------------
 // Google OAuth Client
@@ -96,29 +88,39 @@ app.post('/api/register', async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Email y contraseña son requeridos" });
+
+    if (!email || !password) {
+      console.log("❌ Datos incompletos:", req.body);
+      return res.status(400).json({ error: "Email y contraseña son requeridos" });
+    }
 
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
 
-    const user = rows[0]; // ✅ Declaramos user antes de usarlo
+    if (!rows.length) {
+      console.log("❌ Usuario no encontrado:", email);
+      return res.status(401).json({ error: "Usuario no encontrado" });
+    }
+
+    const user = rows[0];
     console.log("Usuario encontrado:", user.email);
 
     const validPassword = await bcrypt.compare(password, user.password);
-    console.log("Comparación contraseña:", validPassword);
+    console.log("Contraseña válida:", validPassword);
+
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const secret = process.env.JWT_SECRET || "clave_default";
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      secret,
+      process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
 
+    console.log("✅ Login exitoso:", user.email);
     res.json({ token, role: user.role });
+
   } catch (err) {
-    console.error("❌ Error en /api/login:", err.message);
-    res.status(500).json({ error: "Error en login" });
+    console.error("❌ Error en /api/login:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
