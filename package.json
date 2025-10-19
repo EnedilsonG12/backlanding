@@ -2,17 +2,24 @@
   "name": "server",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js" 
+    "dev": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@paypal/react-paypal-js": "^8.8.3",
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "google-auth-library": "^10.3.0",
+    "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.3",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "stripe": "^18.4.0",
     "uuid": "^11.1.0"
   },
