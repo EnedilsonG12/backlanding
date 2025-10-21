@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 // CORS universal
 // ---------------------
 const allowedOrigins = [
-  'https://landingpage-3hlz.vercel.app',
+  'https://landingpage-3hlz-khny3442n-enedilson-gonzalezs-projects.vercel.app/',
   'http://localhost:5173'
 ];
 
