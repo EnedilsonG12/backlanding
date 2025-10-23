@@ -411,22 +411,6 @@ app.get("/api/order_items", async (req, res) => {
     res.status(500).json({ error: "Error al obtener los items de las órdenes" });
   }
 });
-
-// ---------------------
-// Middleware: verificar token JWT
-// ---------------------
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: "Token requerido" });
-
-  const token = authHeader.split(" ")[1];
-  jwt.verify(token, process.env.JWT_SECRET || "clave_default", (err, user) => {
-    if (err) return res.status(403).json({ error: "Token inválido o expirado" });
-    req.user = user;
-    next();
-  });
-};
-
 // ---------------------
 // Valoración de Productos
 // ---------------------
