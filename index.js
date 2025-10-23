@@ -17,10 +17,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------------------
-// CORS universal
+// CORS dinámico
 // ---------------------
 const allowedOrigins = [
-  'https://landingpage-3hlz.vercel.app',
+  process.env.FRONTEND_URL,
   'http://localhost:5173'
 ];
 
@@ -37,10 +37,10 @@ app.use((req, res, next) => {
 });
 
 // ---------------------
-// DB Pool (Railway interno)
+// Conexión MySQL
 // ---------------------
 const pool = mysql.createPool({
-   host: process.env.MYSQLHOST,
+  host: process.env.MYSQLHOST,
   port: Number(process.env.MYSQLPORT),
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
@@ -48,7 +48,6 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
-// Test de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
@@ -65,14 +64,37 @@ const pool = mysql.createPool({
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------------
-// Auth - Registro
+// Middleware JWT
+// ---------------------
+const authMiddleware = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) return res.status(401).json({ error: "Token requerido" });
+
+    // Permitir tanto "Bearer <token>" como solo el token
+    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+
+    if (!token) return res.status(401).json({ error: "Token requerido" });
+
+    const secret = process.env.JWT_SECRET || "clave_default";
+
+    const user = jwt.verify(token, secret);
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error("JWT error:", err);
+    return res.status(403).json({ error: "Token inválido o expirado" });
+  }
+};
+
+// ---------------------
+// AUTH
 // ---------------------
 app.post('/api/register', async (req, res) => {
-  console.log("📥 Datos recibidos:", req.body);
   try {
     const { username, email, password, role } = req.body;
-    if (!username || !email || !password)
-      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    if (!username || !email || !password) return res.status(400).json({ error: 'Todos los campos son requeridos' });
 
     const [existing] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     if (existing.length) return res.status(400).json({ error: 'Usuario ya registrado' });
@@ -82,7 +104,6 @@ app.post('/api/register', async (req, res) => {
       'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
       [username, email, hashedPassword, role || 'user']
     );
-
     res.json({ id: result.insertId, username, role: role || 'user' });
   } catch (err) {
     console.error(err);
@@ -91,7 +112,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // ---------------------
-// Auth - Login
+// Login
 // ---------------------
 app.post("/api/login", async (req, res) => {
   try {
@@ -105,32 +126,23 @@ app.post("/api/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
-
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
     res.json({ token, role: user.role });
   } catch (err) {
-    console.error("❌ Error en /api/login:", err);
+    console.error(err);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
 // ---------------------
-// Google Login
+// Google OAuth
 // ---------------------
 app.post('/api/google-login', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token de Google requerido' });
 
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
+    const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
     const email = payload.email;
     const username = payload.name || payload.email.split('@')[0];
@@ -139,27 +151,23 @@ app.post('/api/google-login', async (req, res) => {
     let user;
 
     if (!rows.length) {
-      const [result] = await pool.query(
-        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
-        [username, email, null, 'user']
-      );
+      const [result] = await pool.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, null, 'user']);
       user = { id: result.insertId, username, email, role: 'user' };
     } else {
       user = rows[0];
     }
 
-    const jwtToken = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
+    const jwtToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
-    console.error('❌ Error login Google:', err.message);
+    console.error(err);
     res.status(400).json({ error: 'Token de Google inválido' });
   }
 });
+
+// ---------------------
+// Usuarios
+// ---------------------
 
 app.get('/api/users', async (req, res) => {
   try {
