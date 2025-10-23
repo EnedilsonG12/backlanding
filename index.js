@@ -735,6 +735,13 @@ app.get("/api/dashboard-stats", async (req, res) => {
 });
 
 // ---------------------
+// Servidor Railway
+// ---------------------
+app.get('/', (req, res) => {
+  res.send('Servidor backend Railway activo 🚀');
+});
+
+// ---------------------
 // Servidor
 // ---------------------
 app.listen(process.env.PORT || 4000, () => {
