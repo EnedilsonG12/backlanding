@@ -741,9 +741,13 @@ app.get('/', (req, res) => {
   res.send('Servidor backend Railway activo 🚀');
 });
 
+app.get('/api/register', (req, res) => {
+  res.send('Ruta POST /api/register activa 🚀');
+});
+
 // ---------------------
 // Servidor
 // ---------------------
-app.listen(process.env.PORT || 4000, () => {
-  console.log(`🚀 Servidor corriendo en el puerto ${process.env.PORT || 4000}`);
+app.listen(process.env.PORT || 8080, () => {
+  console.log(`🚀 Servidor corriendo en el puerto ${process.env.PORT || 8080}`);
 });
