@@ -20,21 +20,29 @@ app.use(express.urlencoded({ extended: true }));
 // CORS dinámico
 // ---------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:5173'
+  process.env.FRONTEND_URL,            // tu frontend en Vercel
+  'http://localhost:5173'              // frontend local
 ];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
+const corsOptions = {
+  origin: function(origin, callback) {
+    // Permitir requests sin origin (ej: Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true,                   // permitir cookies
+};
+
+app.use(cors(corsOptions));
+
+// También asegurarse que Express maneje correctamente las OPTIONS
+app.options('*', cors(corsOptions));
 
 // ---------------------
 // Conexión MySQL
