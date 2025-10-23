@@ -68,6 +68,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Auth - Registro
 // ---------------------
 app.post('/api/register', async (req, res) => {
+  console.log("📥 Datos recibidos:", req.body);
   try {
     const { username, email, password, role } = req.body;
     if (!username || !email || !password)
