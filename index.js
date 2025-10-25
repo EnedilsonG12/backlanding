@@ -38,12 +38,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Asegúrate de que OPTIONS se maneje para todas las rutas
 app.options('/*', cors());
 
-
 // ---------------------
-// Conexión MySQL
+// Conexión MySQL con retry
 // ---------------------
 const pool = mysql.createPool({
   host: process.env.MYSQLHOST,
@@ -54,15 +52,23 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
-(async () => {
-  try {
-    const conn = await pool.getConnection();
-    console.log("✅ Conectado a MySQL");
-    conn.release();
-  } catch (err) {
-    console.error("❌ Error conectando a MySQL:", err);
+async function waitForDB(retries = 10, delay = 3000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const conn = await pool.getConnection();
+      console.log("✅ Conectado a MySQL");
+      conn.release();
+      return;
+    } catch (err) {
+      console.log(`⏳ Esperando MySQL... intento ${i + 1}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
   }
-})();
+  throw new Error("❌ No se pudo conectar a MySQL después de varios intentos");
+}
+
+// Esperar antes de levantar servidor
+await waitForDB();
 
 // ---------------------
 // Google OAuth Client
@@ -75,16 +81,12 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader) return res.status(401).json({ error: "Token requerido" });
 
-    // Permitir tanto "Bearer <token>" como solo el token
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-
     if (!token) return res.status(401).json({ error: "Token requerido" });
 
     const secret = process.env.JWT_SECRET || "clave_default";
-
     const user = jwt.verify(token, secret);
     req.user = user;
     next();
