@@ -39,7 +39,7 @@ app.use(cors({
 }));
 
 // Asegúrate de que OPTIONS se maneje para todas las rutas
-app.options('*', cors());
+app.options('/*', cors());
 
 
 // ---------------------
