@@ -20,21 +20,26 @@ app.use(express.urlencoded({ extended: true }));
 // CORS dinámico
 // ---------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:5173'
+  process.env.FRONTEND_URL?.replace(/\/$/, ""), // quitar slash final
+  "http://localhost:5173"
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true); // Postman o server-side
-    if (allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('No permitido por CORS'));
+    const isAllowed = allowedOrigins.some(url => origin.startsWith(url));
+    if (isAllowed) callback(null, true);
+    else {
+      console.warn("CORS bloqueado para:", origin);
+      callback(new Error("No permitido por CORS"));
+    }
   },
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization"],
   credentials: true
 }));
-app.options('/*', cors());
+
+app.options("*", cors());
 
 // ---------------------
 // Conexión MySQL con pool
@@ -50,9 +55,7 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// ---------------------
-// Intento inicial de conexión (no bloqueante)
-// ---------------------
+// Intento inicial de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
@@ -77,8 +80,6 @@ const authMiddleware = (req, res, next) => {
     if (!authHeader) return res.status(401).json({ error: "Token requerido" });
 
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
-    if (!token) return res.status(401).json({ error: "Token requerido" });
-
     const secret = process.env.JWT_SECRET || "clave_default";
     const user = jwt.verify(token, secret);
     req.user = user;
