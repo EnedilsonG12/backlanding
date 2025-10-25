@@ -27,21 +27,17 @@ const allowedOrigins = [
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin) return callback(null, true); // Postman o server-side
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('No permitido por CORS'));
-    }
+    if (allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('No permitido por CORS'));
   },
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
   credentials: true
 }));
-
 app.options('/*', cors());
 
 // ---------------------
-// Conexión MySQL con retry
+// Conexión MySQL con pool
 // ---------------------
 const pool = mysql.createPool({
   host: process.env.MYSQLHOST,
@@ -49,26 +45,23 @@ const pool = mysql.createPool({
   user: process.env.MYSQLUSER,
   password: process.env.MYSQLPASSWORD,
   database: process.env.MYSQLDATABASE,
+  waitForConnections: true,
   connectionLimit: 10,
+  queueLimit: 0
 });
 
-async function waitForDB(retries = 10, delay = 3000) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const conn = await pool.getConnection();
-      console.log("✅ Conectado a MySQL");
-      conn.release();
-      return;
-    } catch (err) {
-      console.log(`⏳ Esperando MySQL... intento ${i + 1}`);
-      await new Promise(r => setTimeout(r, delay));
-    }
+// ---------------------
+// Intento inicial de conexión (no bloqueante)
+// ---------------------
+(async () => {
+  try {
+    const conn = await pool.getConnection();
+    console.log("✅ Conectado a MySQL");
+    conn.release();
+  } catch (err) {
+    console.warn("⚠️ No se pudo conectar a MySQL al inicio, pero el pool intentará más tarde");
   }
-  throw new Error("❌ No se pudo conectar a MySQL después de varios intentos");
-}
-
-// Esperar antes de levantar servidor
-await waitForDB();
+})();
 
 // ---------------------
 // Google OAuth Client
