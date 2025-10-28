@@ -20,49 +20,51 @@ app.use(express.urlencoded({ extended: true }));
 // CORS dinámico
 // ---------------------
 const allowedOrigins = [
-  process.env.FRONTEND_URL?.replace(/\/$/, ""), // quitar slash final
+  process.env.FRONTEND_URL?.replace(/\/$/, ""),
   "http://localhost:5173"
 ];
 
-app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // Postman o server-side
-    const isAllowed = allowedOrigins.some(url => origin.startsWith(url));
-    if (isAllowed) callback(null, true);
-    else {
-      console.warn("CORS bloqueado para:", origin);
-      callback(new Error("No permitido por CORS"));
-    }
-  },
-  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const isAllowed = allowedOrigins.some((url) => origin.startsWith(url));
+      if (isAllowed) callback(null, true);
+      else {
+        console.warn("CORS bloqueado para:", origin);
+        callback(new Error("No permitido por CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
 app.options("*", cors());
 
 // ---------------------
-// Conexión MySQL con pool
+// Conexión MySQL con pool (CORREGIDA PARA RAILWAY)
 // ---------------------
 const pool = mysql.createPool({
-  host: process.env.MYSQLHOST,
-  port: Number(process.env.MYSQLPORT),
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
+  host: process.env.MYSQLHOST || "gondola.proxy.rlwy.net",
+  port: Number(process.env.MYSQLPORT) || 14733,
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "kwrCArKHTGJPtFZRakGHeixXEhfMviBC",
+  database: process.env.MYSQLDATABASE || "railway",
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
 });
 
 // Intento inicial de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
-    console.log("✅ Conectado a MySQL");
+    console.log("✅ Conectado a MySQL en Railway");
     conn.release();
   } catch (err) {
-    console.warn("⚠️ No se pudo conectar a MySQL al inicio, pero el pool intentará más tarde");
+    console.error("❌ Error conectando a MySQL:", err.message);
   }
 })();
 
@@ -79,7 +81,9 @@ const authMiddleware = (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: "Token requerido" });
 
-    const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : authHeader;
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : authHeader;
     const secret = process.env.JWT_SECRET || "clave_default";
     const user = jwt.verify(token, secret);
     req.user = user;
