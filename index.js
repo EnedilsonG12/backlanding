@@ -19,29 +19,24 @@ app.use(express.urlencoded({ extended: true }));
 // ---------------------
 // CORS dinámico
 // ---------------------
-const allowedOrigins = [
-  process.env.FRONTEND_URL?.replace(/\/$/, ""),
-  "http://localhost:5173"
-];
+// ---------------------
+// CORS configuración correcta
+// ---------------------
+const corsOptions = {
+  origin: [
+    "https://landingpage-3hlz.vercel.app",
+    "http://localhost:5173",
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      const isAllowed = allowedOrigins.some((url) => origin.startsWith(url));
-      if (isAllowed) callback(null, true);
-      else {
-        console.warn("CORS bloqueado para:", origin);
-        callback(new Error("No permitido por CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
+// Aplicar CORS globalmente
+app.use(cors(corsOptions));
 
-app.options("*", cors());
+// Responder a solicitudes OPTIONS (preflight)
+app.options("*", cors(corsOptions));
 
 // ---------------------
 // Conexión MySQL con pool (CORREGIDA PARA RAILWAY)
