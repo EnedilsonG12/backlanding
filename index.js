@@ -52,6 +52,17 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
+// Ajustar tabla users para que el id sea autoincrementable
+pool.query(`
+  ALTER TABLE users 
+  MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT PRIMARY KEY;
+`).then(() => {
+  console.log("✅ Campo 'id' en la tabla 'users' configurado como AUTO_INCREMENT correctamente");
+}).catch((err) => {
+  console.error("⚠️ Error al modificar la tabla 'users':", err.message);
+});
+
+
 // Intento inicial de conexión
 (async () => {
   try {
