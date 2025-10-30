@@ -46,9 +46,7 @@ app.use(express.urlencoded({ extended: true }));
 // CORS dinámico
 // ---------------------
 const corsOptions = {
-  origin: [
-    process.env.FRONTEND_URL || "http://localhost:5173",
-  ],
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -70,7 +68,6 @@ const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-// Intento inicial de conexión
 (async () => {
   try {
     const conn = await pool.getConnection();
@@ -98,7 +95,6 @@ const authMiddleware = (req, res, next) => {
       ? authHeader.split(" ")[1]
       : authHeader;
 
-    // JWT_SECRET seguro
     const secret = process.env.JWT_SECRET;
     const user = jwt.verify(token, secret);
     req.user = user;
@@ -109,6 +105,11 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// ---------------------
+// JWT seguro
+// ---------------------
+const JWT_SECRET = process.env.JWT_SECRET;
+console.log('✅ JWT_SECRET cargado correctamente');
 // ---------------------
 // Rutas de autenticación
 // ---------------------
