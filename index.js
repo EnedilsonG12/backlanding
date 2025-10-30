@@ -1,13 +1,39 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import { OAuth2Client } from 'google-auth-library';
 
-dotenv.config();
+// ---------------------
+// Cargar dotenv solo en desarrollo
+// ---------------------
+if (process.env.NODE_ENV !== "production") {
+  import('dotenv').then(dotenv => dotenv.config());
+}
+
+// ---------------------
+// Validación de variables críticas
+// ---------------------
+const requiredEnv = [
+  "JWT_SECRET",
+  "MYSQLHOST",
+  "MYSQLUSER",
+  "MYSQLPASSWORD",
+  "MYSQLDATABASE",
+  "PAYPAL_CLIENT_ID",
+  "PAYPAL_SECRET",
+  "GOOGLE_CLIENT_ID"
+];
+
+requiredEnv.forEach((key) => {
+  if (!process.env[key]) {
+    console.error(`❌ La variable de entorno ${key} no está definida`);
+    process.exit(1);
+  }
+});
+
 const app = express();
 
 // ---------------------
@@ -19,53 +45,31 @@ app.use(express.urlencoded({ extended: true }));
 // ---------------------
 // CORS dinámico
 // ---------------------
-// ---------------------
-// CORS configuración correcta
-// ---------------------
 const corsOptions = {
   origin: [
-    "https://landingpage-3hlz.vercel.app",
-    "http://localhost:5173",
+    process.env.FRONTEND_URL || "http://localhost:5173",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
 };
-
-// Aplicar CORS globalmente
 app.use(cors(corsOptions));
-
-// Responder a solicitudes OPTIONS (preflight)
 app.options("*", cors(corsOptions));
 
 // ---------------------
-// Conexión MySQL con pool (CORREGIDA PARA RAILWAY)
+// Conexión MySQL
 // ---------------------
 const pool = mysql.createPool({
-  host: process.env.MYSQLHOST || "gondola.proxy.rlwy.net",
-  port: Number(process.env.MYSQLPORT) || 14733,
-  user: process.env.MYSQLUSER || "root",
-  password: process.env.MYSQLPASSWORD || "kwrCArKHTGJPtFZRakGHeixXEhfMviBC",
-  database: process.env.MYSQLDATABASE || "railway",
+  host: process.env.MYSQLHOST,
+  port: Number(process.env.MYSQLPORT) || 3306,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
-// Ajustar tabla users para que el id sea autoincrementable
-/*(async () => {
-  try {
-    await pool.query(`ALTER TABLE users MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT`);
-    await pool.query(`ALTER TABLE users MODIFY COLUMN username VARCHAR(100) NOT NULL`);
-    await pool.query(`ALTER TABLE users MODIFY COLUMN email VARCHAR(255) NOT NULL`);
-    await pool.query(`ALTER TABLE users MODIFY COLUMN password VARCHAR(255)`);
-    await pool.query(`ALTER TABLE users MODIFY COLUMN role VARCHAR(50) DEFAULT 'user'`);
-    console.log("✅ Tabla 'users' actualizada correctamente");
-  } catch (err) {
-    console.error("⚠️ Error al modificar la tabla 'users':", err.message);
-  }
-})();
-*/
 // Intento inicial de conexión
 (async () => {
   try {
@@ -93,19 +97,23 @@ const authMiddleware = (req, res, next) => {
     const token = authHeader.startsWith("Bearer ")
       ? authHeader.split(" ")[1]
       : authHeader;
-    const secret = process.env.JWT_SECRET || "clave_default";
+
+    // JWT_SECRET seguro
+    const secret = process.env.JWT_SECRET;
     const user = jwt.verify(token, secret);
     req.user = user;
     next();
   } catch (err) {
-    console.error("JWT error:", err);
+    console.error("JWT error:", err.message);
     return res.status(403).json({ error: "Token inválido o expirado" });
   }
 };
 
 // ---------------------
-// AUTH
+// Rutas de autenticación
 // ---------------------
+
+// Register
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
@@ -119,16 +127,15 @@ app.post('/api/register', async (req, res) => {
       'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
       [username, email, hashedPassword, role || 'user']
     );
+
     res.json({ id: result.insertId, username, role: role || 'user' });
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.status(500).json({ error: 'Error al registrar usuario' });
   }
 });
 
-// ---------------------
 // Login
-// ---------------------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -141,17 +148,20 @@ app.post("/api/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
     res.json({ token, role: user.role });
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
-// ---------------------
 // Google OAuth
-// ---------------------
 app.post('/api/google-login', async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: 'Token de Google requerido' });
@@ -166,7 +176,10 @@ app.post('/api/google-login', async (req, res) => {
     let user;
 
     if (!rows.length) {
-      const [result] = await pool.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [username, email, null, 'user']);
+      const [result] = await pool.query(
+        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+        [username, email, null, 'user']
+      );
       user = { id: result.insertId, username, email, role: 'user' };
     } else {
       user = rows[0];
@@ -175,7 +188,7 @@ app.post('/api/google-login', async (req, res) => {
     const jwtToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.status(400).json({ error: 'Token de Google inválido' });
   }
 });
