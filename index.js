@@ -58,7 +58,7 @@ pool.query(`
   MODIFY COLUMN username VARCHAR(100) NOT NULL,
   MODIFY COLUMN email VARCHAR(255) NOT NULL,
   MODIFY COLUMN password VARCHAR(255),
-  MODIFY COLUMN role VARCHAR(50) DEFAULT 'user',;
+  MODIFY COLUMN role VARCHAR(50) DEFAULT 'user';
 `).then(() => {
   console.log("✅ Campo 'id' en la tabla 'users' configurado como AUTO_INCREMENT correctamente");
 }).catch((err) => {
