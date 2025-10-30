@@ -53,17 +53,18 @@ const pool = mysql.createPool({
 });
 
 // Ajustar tabla users para que el id sea autoincrementable
-pool.query(`
-  ALTER TABLE users MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT,
-  MODIFY COLUMN username VARCHAR(100) NOT NULL,
-  MODIFY COLUMN email VARCHAR(255) NOT NULL,
-  MODIFY COLUMN password VARCHAR(255),
-  MODIFY COLUMN role VARCHAR(50) DEFAULT 'user';
-`).then(() => {
-  console.log("✅ Campo 'id' en la tabla 'users' configurado como AUTO_INCREMENT correctamente");
-}).catch((err) => {
-  console.error("⚠️ Error al modificar la tabla 'users':", err.message);
-});
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE users MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT`);
+    await pool.query(`ALTER TABLE users MODIFY COLUMN username VARCHAR(100) NOT NULL`);
+    await pool.query(`ALTER TABLE users MODIFY COLUMN email VARCHAR(255) NOT NULL`);
+    await pool.query(`ALTER TABLE users MODIFY COLUMN password VARCHAR(255)`);
+    await pool.query(`ALTER TABLE users MODIFY COLUMN role VARCHAR(50) DEFAULT 'user'`);
+    console.log("✅ Tabla 'users' actualizada correctamente");
+  } catch (err) {
+    console.error("⚠️ Error al modificar la tabla 'users':", err.message);
+  }
+})();
 
 // Intento inicial de conexión
 (async () => {
