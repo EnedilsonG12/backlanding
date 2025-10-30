@@ -53,7 +53,7 @@ const pool = mysql.createPool({
 });
 
 // Ajustar tabla users para que el id sea autoincrementable
-(async () => {
+/*(async () => {
   try {
     await pool.query(`ALTER TABLE users MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT`);
     await pool.query(`ALTER TABLE users MODIFY COLUMN username VARCHAR(100) NOT NULL`);
@@ -65,7 +65,7 @@ const pool = mysql.createPool({
     console.error("⚠️ Error al modificar la tabla 'users':", err.message);
   }
 })();
-
+*/
 // Intento inicial de conexión
 (async () => {
   try {
