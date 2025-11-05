@@ -10,30 +10,30 @@ import { OAuth2Client } from "google-auth-library";
 // Cargar dotenv solo en entorno local
 // ---------------------
 if (!process.env.RAILWAY_ENVIRONMENT && process.env.NODE_ENV !== "production") {
-const dotenv = await import("dotenv");
-dotenv.config();
-console.log("🌱 Variables cargadas desde .env");
+  const dotenv = await import("dotenv");
+  dotenv.config();
+  console.log("🌱 Variables cargadas desde .env");
 }
 
 // ---------------------
 // Verificar variables críticas
 // ---------------------
 const requiredEnv = [
-"JWT_SECRET",
-"MYSQLHOST",
-"MYSQLUSER",
-"MYSQLPASSWORD",
-"MYSQLDATABASE",
-"PAYPAL_CLIENT_ID",
-"PAYPAL_SECRET",
-"GOOGLE_CLIENT_ID",
+  "JWT_SECRET",
+  "MYSQLHOST",
+  "MYSQLUSER",
+  "MYSQLPASSWORD",
+  "MYSQLDATABASE",
+  "PAYPAL_CLIENT_ID",
+  "PAYPAL_SECRET",
+  "GOOGLE_CLIENT_ID",
 ];
 
 for (const key of requiredEnv) {
-if (!process.env[key]) {
-console.warn("⚠️ Advertencia: La variable ${key} no está definida.");
-process.exit(1);
-}
+  if (!process.env[key]) {
+    console.warn(`⚠️ Advertencia: La variable ${key} no está definida.`);
+    process.exit(1);
+  }
 }
 
 const app = express();
@@ -42,10 +42,10 @@ const app = express();
 // Configurar CORS
 // ---------------------
 const corsOptions = {
-origin: process.env.FRONTEND_URL || "http://localhost:5173",
-methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-allowedHeaders: ["Content-Type", "Authorization"],
-credentials: true,
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
 };
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -55,23 +55,23 @@ app.use(express.urlencoded({ extended: true }));
 // Conexión MySQL (Railway)
 // ---------------------
 const pool = mysql.createPool({
-host: process.env.MYSQLHOST,
-port: Number(process.env.MYSQLPORT) || 3306,
-user: process.env.MYSQLUSER,
-password: process.env.MYSQLPASSWORD,
-database: process.env.MYSQLDATABASE,
-waitForConnections: true,
-connectionLimit: 10,
-queueLimit: 0,
+  host: process.env.MYSQLHOST,
+  port: Number(process.env.MYSQLPORT) || 3306,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
 try {
-const conn = await pool.getConnection();
-console.log("✅ Conectado correctamente a MySQL en Railway");
-conn.release();
+  const conn = await pool.getConnection();
+  console.log("✅ Conectado correctamente a MySQL en Railway");
+  conn.release();
 } catch (err) {
-console.error("❌ Error conectando a MySQL:", err.message);
-process.exit(1);
+  console.error("❌ Error conectando a MySQL:", err.message);
+  process.exit(1);
 }
 
 // ---------------------
@@ -83,55 +83,44 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Middleware JWT
 // ---------------------
 const authMiddleware = (req, res, next) => {
-try {
-const header = req.headers.authorization;
-if (!header) return res.status(401).json({ error: "Token requerido" });
+  try {
+    const header = req.headers.authorization;
+    if (!header) return res.status(401).json({ error: "Token requerido" });
 
-const token = header.startsWith("Bearer ") ? header.slice(7) : header;
-const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = header.startsWith("Bearer ") ? header.slice(7) : header;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-req.user = decoded;
-next();
-
-} catch (err) {
-console.error("JWT error:", err.message);
-res.status(403).json({ error: "Token inválido o expirado" });
-}
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("JWT error:", err.message);
+    res.status(403).json({ error: "Token inválido o expirado" });
+  }
 };
 
 // ---------------------
-// Rutas principales
+// Ruta base y pruebas
 // ---------------------
 app.get("/", (req, res) => {
-res.send("✅ Servidor backend activo en Railway");
+  res.send("✅ Servidor backend activo en Railway");
 });
 
-
-
-
-// 🔹 Ejemplo rápido para probar JWT_SECRET
 app.get("/api/test-env", (req, res) => {
-res.json({ jwtSecret: process.env.JWT_SECRET ? "OK ✅" : "FALTA ❌" });
+  res.json({ jwtSecret: process.env.JWT_SECRET ? "OK ✅" : "FALTA ❌" });
 });
 
-
-
-
-// 🔹 Ejemplo para probar conexión
 app.get("/api/db-test", async (req, res) => {
-try {
-const [rows] = await pool.query("SELECT NOW() AS fecha_actual");
-res.json({ conexion: "exitosa ✅", fecha: rows[0].fecha_actual });
-} catch (err) {
-res.status(500).json({ error: "Error conectando a MySQL", details: err.message });
-}
+  try {
+    const [rows] = await pool.query("SELECT NOW() AS fecha_actual");
+    res.json({ conexion: "exitosa ✅", fecha: rows[0].fecha_actual });
+  } catch (err) {
+    res.status(500).json({ error: "Error conectando a MySQL", details: err.message });
+  }
 });
 
 // ---------------------
-// Rutas de autenticación
-// ---------------------
-
 // Registro de usuario
+// ---------------------
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
@@ -155,7 +144,9 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+// ---------------------
 // Inicio de sesión
+// ---------------------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -183,35 +174,44 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// ---------------------
 // Google OAuth
-app.post('/api/google-login', async (req, res) => {
+// ---------------------
+app.post("/api/google-login", async (req, res) => {
   const { token } = req.body;
-  if (!token) return res.status(400).json({ error: 'Token de Google requerido' });
+  if (!token) return res.status(400).json({ error: "Token de Google requerido" });
 
   try {
-    const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
     const payload = ticket.getPayload();
     const email = payload.email;
-    const username = payload.name || payload.email.split('@')[0];
+    const username = payload.name || email.split("@")[0];
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     let user;
 
     if (!rows.length) {
       const [result] = await pool.query(
-        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
-        [username, email, null, 'user']
+        "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
+        [username, email, null, "user"]
       );
-      user = { id: result.insertId, username, email, role: 'user' };
+      user = { id: result.insertId, username, email, role: "user" };
     } else {
       user = rows[0];
     }
 
-    const jwtToken = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const jwtToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
     console.error(err.message);
-    res.status(400).json({ error: 'Token de Google inválido' });
+    res.status(400).json({ error: "Token de Google inválido" });
   }
 });
 
