@@ -102,7 +102,7 @@ const authMiddleware = (req, res, next) => {
 // Ruta base y pruebas
 // ---------------------
 app.get("/", (req, res) => {
-  res.send("✅ Servidor backend activo en Railway");
+  res.send("✅ Servidor backend activo en Railway 🚀");
 });
 
 app.get("/api/test-env", (req, res) => {
