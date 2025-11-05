@@ -116,13 +116,6 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ---------------------
-// EJEMPLO DE RUTA PROTEGIDA
-// ---------------------
-app.get("/api/protegida", authMiddleware, (req, res) => {
-  res.json({ message: "Acceso concedido", user: req.user });
-});
-
-// ---------------------
 // Registro de usuario
 // ---------------------
 app.post("/api/register", async (req, res) => {
