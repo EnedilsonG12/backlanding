@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import axios from "axios";
+import { OAuth2Client } from "google-auth-library";
 
 dotenv.config();
 const app = express();
@@ -15,11 +17,11 @@ app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
 
 // ---------------------
-// LIMPIAR JWT_SECRET (para evitar comillas en Railway)
+// LIMPIAR JWT_SECRET (para evitar comillas de Railway)
 // ---------------------
 if (process.env.JWT_SECRET) {
   process.env.JWT_SECRET = process.env.JWT_SECRET.replace(/^['"]|['"]$/g, "").trim();
-  console.log("🔐 JWT_SECRET cargado correctamente");
+  console.log("🔐 JWT_SECRET cargado correctamente:", process.env.JWT_SECRET ? "Sí" : "No");
 } else {
   console.warn("⚠️ Advertencia: JWT_SECRET no está definido");
 }
@@ -27,7 +29,7 @@ if (process.env.JWT_SECRET) {
 // ---------------------
 // VALIDACIÓN DE VARIABLES .ENV
 // ---------------------
-const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE", "JWT_SECRET"];
+const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE"];
 for (const key of requiredEnv) {
   if (!process.env[key]) console.warn(`⚠️ Advertencia: La variable ${key} no está definida.`);
 }
@@ -53,13 +55,20 @@ try {
 }
 
 // ---------------------
-// MIDDLEWARE JWT (CORREGIDO)
+// GOOGLE OAUTH CLIENT
+// ---------------------
+let googleClient = null;
+if (process.env.GOOGLE_CLIENT_ID) {
+  googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+}
+
+// ---------------------
+// MIDDLEWARE JWT
 // ---------------------
 const authMiddleware = (req, res, next) => {
   try {
     const header = req.headers.authorization;
-    if (!header)
-      return res.status(401).json({ error: "Falta el encabezado Authorization" });
+    if (!header) return res.status(401).json({ error: "Falta el encabezado Authorization" });
 
     const token = header.startsWith("Bearer ") ? header.split(" ")[1] : header;
 
@@ -78,7 +87,7 @@ const authMiddleware = (req, res, next) => {
 };
 
 // ---------------------
-// ENDPOINT LOGIN (CORREGIDO)
+// LOGIN
 // ---------------------
 app.post("/api/login", async (req, res) => {
   try {
@@ -92,11 +101,6 @@ app.post("/api/login", async (req, res) => {
     const user = rows[0];
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
-
-    if (!process.env.JWT_SECRET) {
-      console.error("❌ JWT_SECRET no definido en variables de entorno");
-      return res.status(500).json({ error: "Error de configuración del servidor" });
-    }
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -116,7 +120,7 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ---------------------
-// Registro de usuario
+// REGISTRO
 // ---------------------
 app.post("/api/register", async (req, res) => {
   try {
@@ -142,13 +146,15 @@ app.post("/api/register", async (req, res) => {
 });
 
 // ---------------------
-// Google OAuth
+// GOOGLE LOGIN
 // ---------------------
 app.post("/api/google-login", async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ error: "Token de Google requerido" });
 
   try {
+    if (!googleClient) throw new Error("Google Client ID no configurado");
+
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -177,8 +183,8 @@ app.post("/api/google-login", async (req, res) => {
     );
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
-    console.error(err.message);
-    res.status(400).json({ error: "Token de Google inválido" });
+    console.error("❌ Error en Google login:", err.message);
+    res.status(400).json({ error: "Token de Google inválido o configuración faltante" });
   }
 });
 
