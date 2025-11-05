@@ -15,20 +15,21 @@ app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
 
 // ---------------------
+// LIMPIAR JWT_SECRET (para evitar comillas en Railway)
+// ---------------------
+if (process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = process.env.JWT_SECRET.replace(/^['"]|['"]$/g, "").trim();
+  console.log("🔐 JWT_SECRET cargado correctamente");
+} else {
+  console.warn("⚠️ Advertencia: JWT_SECRET no está definido");
+}
+
+// ---------------------
 // VALIDACIÓN DE VARIABLES .ENV
 // ---------------------
-const requiredEnv = [
-  "MYSQLHOST",
-  "MYSQLUSER",
-  "MYSQLPASSWORD",
-  "MYSQLDATABASE",
-  "JWT_SECRET",
-];
-
+const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE", "JWT_SECRET"];
 for (const key of requiredEnv) {
-  if (!process.env[key]) {
-    console.warn(`⚠️ Advertencia: La variable ${key} no está definida.`);
-  }
+  if (!process.env[key]) console.warn(`⚠️ Advertencia: La variable ${key} no está definida.`);
 }
 
 // ---------------------
@@ -57,9 +58,8 @@ try {
 const authMiddleware = (req, res, next) => {
   try {
     const header = req.headers.authorization;
-    if (!header) {
+    if (!header)
       return res.status(401).json({ error: "Falta el encabezado Authorization" });
-    }
 
     const token = header.startsWith("Bearer ") ? header.split(" ")[1] : header;
 
@@ -83,7 +83,6 @@ const authMiddleware = (req, res, next) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password)
       return res.status(400).json({ error: "Email y contraseña son requeridos" });
 
@@ -120,10 +119,7 @@ app.post("/api/login", async (req, res) => {
 // EJEMPLO DE RUTA PROTEGIDA
 // ---------------------
 app.get("/api/protegida", authMiddleware, (req, res) => {
-  res.json({
-    message: "Acceso concedido",
-    user: req.user,
-  });
+  res.json({ message: "Acceso concedido", user: req.user });
 });
 
 // ---------------------
