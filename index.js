@@ -16,7 +16,15 @@ app.use(cors());
 // 🔧 Verificación de entorno
 // =========================
 if (process.env.NODE_ENV !== 'production') {
-  const requiredEnv = ['MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE', 'JWT_TOKEN'];
+  const requiredEnv = [
+    'MYSQLHOST',
+    'MYSQLUSER',
+    'MYSQLPASSWORD',
+    'MYSQLDATABASE',
+    'JWT_TOKEN',
+    'PAYPAL_CLIENT_ID',
+    'PAYPAL_SECRET'
+  ];
   requiredEnv.forEach((v) => {
     if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
   });
@@ -33,6 +41,9 @@ try {
     password: process.env.MYSQLPASSWORD,
     database: process.env.MYSQLDATABASE,
     port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
   });
   console.log('✅ Conexión a MySQL configurada correctamente');
 } catch (error) {
@@ -83,14 +94,14 @@ app.post("/api/login", async (req, res) => {
 
   try {
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
+    if (!rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
 
     const user = rows[0];
-    const passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = user.password ? await bcrypt.compare(password, user.password) : false;
     if (!passwordMatch) return res.status(401).json({ message: "Contraseña incorrecta" });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, rol: user.rol },
+      { id: user.id, email: user.email, role: user.role },
       process.env.JWT_TOKEN,
       { expiresIn: "8h" }
     );
@@ -141,6 +152,8 @@ app.get("/api/env", (req, res) => {
     MYSQLDATABASE: !!process.env.MYSQLDATABASE,
     JWT_TOKEN: !!process.env.JWT_TOKEN,
     NODE_ENV: process.env.NODE_ENV,
+    PAYPAL_CLIENT_ID: !!process.env.PAYPAL_CLIENT_ID,
+    PAYPAL_SECRET: !!process.env.PAYPAL_SECRET
   });
 });
 
