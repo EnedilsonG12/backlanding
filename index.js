@@ -1,62 +1,51 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import mysql from "mysql2/promise";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import axios from "axios";
-import { OAuth2Client } from "google-auth-library";
+import express from 'express';
+import cors from 'cors';
+import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-dotenv.config();
-const app = express();
-
-// ---------------------
-// MIDDLEWARES
-// ---------------------
-app.use(express.json());
-app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
-
-// ---------------------
-// LIMPIAR VARIABLES .ENV (por si Railway agrega comillas)
-// ---------------------
-for (const key in process.env) {
-  if (typeof process.env[key] === "string") {
-    process.env[key] = process.env[key].replace(/^['"]|['"]$/g, "").trim();
-  }
+// Solo carga dotenv si estás en local
+import dotenv from 'dotenv';
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
 }
 
-// ---------------------
-// VALIDACIÓN DE VARIABLES
-// ---------------------
-const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE"];
+const app = express();
+const PORT = process.env.PORT || 8080;
+
+// Validar variables críticas
+const requiredEnv = ['MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE', 'JWT_SECRET'];
 requiredEnv.forEach((key) => {
-  if (!process.env[key]) console.warn(`⚠️ Falta la variable: ${key}`);
+  if (!process.env[key]) {
+    console.warn(`⚠️ Falta la variable: ${key}`);
+  }
 });
 
-// ---------------------
-// CONEXIÓN MYSQL (con reintento)
-// ---------------------
-let pool;
-const connectDB = async () => {
+// Conexión a MySQL (pool)
+const pool = mysql.createPool({
+  host: process.env.MYSQLHOST,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  port: process.env.MYSQLPORT || 3306,
+  ssl: {
+    rejectUnauthorized: false, // Necesario en Railway
+  },
+});
+
+app.use(cors());
+app.use(express.json());
+
+// Ruta de prueba
+app.get('/api/test', async (req, res) => {
   try {
-    pool = await mysql.createPool({
-      host: process.env.MYSQLHOST,
-      user: process.env.MYSQLUSER,
-      password: process.env.MYSQLPASSWORD,
-      database: process.env.MYSQLDATABASE,
-      port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
-    await pool.query("SELECT 1");
-    console.log("✅ Conectado a MySQL correctamente.");
-  } catch (error) {
-    console.error("❌ Error conectando a MySQL, reintentando en 3s:", error.message);
-    setTimeout(connectDB, 3000);
+    const [rows] = await pool.query('SELECT 1');
+    res.json({ status: 'ok', mysql: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', mysql: false });
   }
-};
-connectDB();
+});
 
 // ---------------------
 // GOOGLE OAUTH CLIENT
