@@ -42,7 +42,6 @@ try {
     connectionLimit: 10,
     queueLimit: 0,
   });
-
   console.log("✅ Conexión a MySQL configurada correctamente");
 } catch (error) {
   console.error("❌ Error al configurar MySQL:", error.message);
@@ -65,8 +64,12 @@ const authMiddleware = (req, res, next) => {
 };
 
 // ========================
-// Rutas de prueba
+// Rutas base
 // ========================
+app.get("/", (req, res) => {
+  res.send("Servidor backend Railway activo 🚀");
+});
+
 app.get("/api/test", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT 1 + 1 AS result");
@@ -82,39 +85,29 @@ app.get("/api/protegido", authMiddleware, (req, res) => {
 });
 
 // ---------------------
-// Ruta de login (CORREGIDA)
+// Ruta de login
 // ---------------------
-app.post('/api/login', async (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (rows.length === 0) return res.status(404).json({ message: "Usuario no encontrado" });
 
     const user = rows[0];
     const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) return res.status(401).json({ message: "Contraseña incorrecta" });
 
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Contraseña incorrecta' });
-    }
-
-    // Crear token JWT usando JWT_TOKEN
     const token = jwt.sign(
       { id: user.id, email: user.email, rol: user.rol },
       process.env.JWT_TOKEN,
-      { expiresIn: '8h' }
+      { expiresIn: "8h" }
     );
 
-    res.json({ message: 'Login exitoso', token });
+    res.json({ message: "Login exitoso", token });
   } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ message: 'Error en el servidor' });
+    console.error("Error en login:", error);
+    res.status(500).json({ message: "Error en el servidor" });
   }
 });
 
@@ -128,8 +121,7 @@ app.post("/api/register", async (req, res) => {
       return res.status(400).json({ error: "Todos los campos son requeridos" });
 
     const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (existing.length)
-      return res.status(400).json({ error: "Usuario ya registrado" });
+    if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
@@ -145,7 +137,7 @@ app.post("/api/register", async (req, res) => {
 });
 
 // ---------------------
-// Google Login (corregido: usa JWT_TOKEN)
+// Google Login
 // ---------------------
 app.post("/api/google-login", async (req, res) => {
   const { token } = req.body;
@@ -170,18 +162,12 @@ app.post("/api/google-login", async (req, res) => {
       process.env.JWT_TOKEN,
       { expiresIn: "1h" }
     );
+
     res.json({ token: jwtToken, role: user.role });
   } catch (err) {
     console.error("❌ Error en Google login:", err.message);
     res.status(400).json({ error: "Error en Google login" });
   }
-});
-
-// ---------------------
-// Servidor Railway
-// ---------------------
-app.get("/", (req, res) => {
-  res.send("Servidor backend Railway activo 🚀");
 });
 
 // ---------------------
