@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -36,31 +39,6 @@ try {
   console.error('❌ Error al configurar conexión a MySQL:', error.message);
 }
 
-// =========================
-// 🧪 Ruta de prueba
-// =========================
-app.get('/api/test', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT 1 + 1 AS result');
-    res.json({ status: 'ok', mysql: true, result: rows[0].result });
-  } catch (err) {
-    console.error('Error al conectar con MySQL:', err);
-    res.status(500).json({ status: 'error', mysql: false, error: err.message });
-  }
-});
-
-// =========================
-// 🔍 Diagnóstico opcional
-// =========================
-app.get('/api/env', (req, res) => {
-  res.json({
-    MYSQLHOST: !!process.env.MYSQLHOST,
-    MYSQLUSER: !!process.env.MYSQLUSER,
-    MYSQLDATABASE: !!process.env.MYSQLDATABASE,
-    NODE_ENV: process.env.NODE_ENV,
-  });
-});
-
 // ========================
 // Middleware de autenticación JWT
 // ========================
@@ -84,6 +62,9 @@ app.get("/", (req, res) => {
   res.send("Servidor backend Railway activo 🚀");
 });
 
+// =========================
+// 🧪 Ruta de prueba
+// =========================
 app.get("/api/test", async (req, res) => {
   try {
     const [rows] = await pool.query("SELECT 1 + 1 AS result");
@@ -94,13 +75,9 @@ app.get("/api/test", async (req, res) => {
   }
 });
 
-app.get("/api/protegido", authMiddleware, (req, res) => {
-  res.json({ message: "Acceso permitido", user: req.user });
-});
-
-// ---------------------
-// Ruta de login
-// ---------------------
+// ========================
+// Login y Registro
+// ========================
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -125,9 +102,6 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ---------------------
-// Registro de usuarios
-// ---------------------
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
@@ -148,6 +122,26 @@ app.post("/api/register", async (req, res) => {
     console.error("❌ Error en registro:", err.message);
     res.status(500).json({ error: "Error al registrar usuario" });
   }
+});
+
+// ========================
+// Ruta protegida de prueba
+// ========================
+app.get("/api/protegido", authMiddleware, (req, res) => {
+  res.json({ message: "Acceso permitido", user: req.user });
+});
+
+// =========================
+// 🔍 Diagnóstico opcional
+// =========================
+app.get("/api/env", (req, res) => {
+  res.json({
+    MYSQLHOST: !!process.env.MYSQLHOST,
+    MYSQLUSER: !!process.env.MYSQLUSER,
+    MYSQLDATABASE: !!process.env.MYSQLDATABASE,
+    JWT_TOKEN: !!process.env.JWT_TOKEN,
+    NODE_ENV: process.env.NODE_ENV,
+  });
 });
 
 // ---------------------
