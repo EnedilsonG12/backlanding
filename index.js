@@ -1,124 +1,109 @@
-import express from "express";
-import cors from "cors";
-import mysql from "mysql2/promise";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import axios from "axios";
-import { OAuth2Client } from "google-auth-library";
-import dotenv from "dotenv";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import axios from 'axios';
+import { OAuth2Client } from 'google-auth-library';
 
-// Cargar dotenv solo en entorno local
-if (process.env.NODE_ENV !== "production") {
-  dotenv.config();
-}
-
+dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 8080;
 
 // ---------------------
-// Middleware
+// Middleware JSON y CORS
 // ---------------------
-app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || process.env.FRONTEND_URL || '*',
+    credentials: true,
+  })
+);
 
 // ---------------------
-// Validar variables de entorno
+// Validar variables requeridas
 // ---------------------
 const requiredEnv = [
-  "MYSQLHOST",
-  "MYSQLUSER",
-  "MYSQLPASSWORD",
-  "MYSQLDATABASE",
-  "JWT_SECRET",
+  'MYSQLHOST',
+  'MYSQLUSER',
+  'MYSQLPASSWORD',
+  'MYSQLDATABASE',
+  'MYSQLPORT',
+  'JWT_TOKEN', // ← aquí se usa tu variable real
 ];
+
 requiredEnv.forEach((key) => {
   if (!process.env[key]) {
-    console.warn(`⚠️ Falta la variable: ${key}`);
+    console.warn(`⚠️  Falta la variable de entorno: ${key}`);
   }
 });
 
 // ---------------------
-// Conexión MySQL (pool)
+// Conexión a MySQL
 // ---------------------
-const pool = mysql.createPool({
-  host: process.env.MYSQLHOST,
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
-  port: process.env.MYSQLPORT || 3306,
-  ssl: {
-    rejectUnauthorized: false, // Necesario para Railway
-  },
-});
+let connection;
 
-// ---------------------
-// Ruta de prueba base
-// ---------------------
-app.get("/", (req, res) => {
-  res.send("🚀 Backend activo en Railway");
-});
-
-// ---------------------
-//conexión MySQL
-// ---------------------
-app.get("/api/test", async (req, res) => {
+const connectDB = async () => {
   try {
-    const [rows] = await pool.query("SELECT 1");
-    res.json({ status: "ok", mysql: true });
-  } catch (err) {
-    console.error("❌ Error conexión MySQL:", err.message);
-    res.status(500).json({ status: "error", mysql: false });
+    connection = await mysql.createConnection({
+      host: process.env.MYSQLHOST,
+      user: process.env.MYSQLUSER,
+      password: process.env.MYSQLPASSWORD,
+      database: process.env.MYSQLDATABASE,
+      port: process.env.MYSQLPORT || 3306,
+    });
+    console.log('✅ Conexión a MySQL exitosa');
+  } catch (error) {
+    console.error('❌ Error al conectar a MySQL:', error.message);
+    process.exit(1);
   }
-});
-
-// ---------------------
-// Google OAuth Client
-// ---------------------
-let googleClient = null;
-if (process.env.GOOGLE_CLIENT_ID) {
-  googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-}
-
-// ---------------------
-// Middleware JWT
-// ---------------------
-const authMiddleware = (req, res, next) => {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: "Falta el token" });
-
-  const token = header.startsWith("Bearer ") ? header.split(" ")[1] : header;
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: "Token inválido o expirado" });
-    req.user = decoded;
-    next();
-  });
 };
+connectDB();
 
 // ---------------------
-// LOGIN
+// Ruta de prueba
 // ---------------------
-app.post("/api/login", async (req, res) => {
+app.get('/', (req, res) => {
+  res.json({ message: '🚀 Servidor funcionando correctamente' });
+});
+
+// ---------------------
+// Ruta de login (ejemplo)
+// ---------------------
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
   try {
-    const { email, password } = req.body;
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
-      email,
-    ]);
-    if (!rows.length) return res.status(404).json({ error: "Usuario no encontrado" });
-
-    const user = rows[0];
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: "Contraseña incorrecta" });
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
+    const [rows] = await connection.execute(
+      'SELECT * FROM users WHERE email = ?',
+      [email]
     );
 
-    res.json({ message: "Login exitoso", token });
-  } catch (err) {
-    console.error("❌ Error en login:", err.message);
-    res.status(500).json({ error: "Error en el servidor" });
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    const user = rows[0];
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Contraseña incorrecta' });
+    }
+
+    // Crear token JWT usando JWT_TOKEN
+    const token = jwt.sign(
+      { id: user.id, email: user.email, rol: user.rol },
+      process.env.JWT_TOKEN, // ← cambio aquí
+      { expiresIn: '8h' }
+    );
+
+    res.json({ message: 'Login exitoso', token });
+  } catch (error) {
+    console.error('Error en login:', error);
+    res.status(500).json({ message: 'Error en el servidor' });
   }
 });
 
