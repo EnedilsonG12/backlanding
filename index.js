@@ -21,7 +21,7 @@ const requiredEnv = [
 'JWT_TOKEN', 'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET'
 ];
 requiredEnv.forEach(v => {
-if (!process.env[v]) console.warn(⚠️ Falta la variable de entorno: ${v});
+if (!process.env[v]) console.warn("⚠️ Falta la variable de entorno: ${v}");
 });
 }
 
