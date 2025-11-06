@@ -1,50 +1,40 @@
-import dotenv from "dotenv";
-dotenv.config();
-import express from "express";
-import cors from "cors";
-import mysql from "mysql2/promise";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-import axios from "axios";
+import express from 'express';
+import cors from 'cors';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 const app = express();
-
-// ========================
-// Middleware base
-// ========================
+app.use(cors());
 app.use(express.json());
-app.use(cors({
-  origin: process.env.CLIENT_URL || "*",
-  credentials: true,
-}));
 
-// ========================
-// Validar variables requeridas
-// ========================
-const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE", "JWT_TOKEN"];
-for (const v of requiredEnv) {
+// ✅ Verificar variables importantes
+const requiredEnv = ['MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE'];
+requiredEnv.forEach((v) => {
   if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
-}
+});
 
-// ========================
-// Conexión a MySQL
-// ========================
-let pool;
-try {
-  pool = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-  console.log("✅ Conexión a MySQL configurada correctamente");
-} catch (error) {
-  console.error("❌ Error al configurar MySQL:", error.message);
-}
+// ✅ Configurar conexión a MySQL
+const pool = await mysql.createPool({
+  host: process.env.MYSQLHOST,
+  user: process.env.MYSQLUSER,
+  password: process.env.MYSQLPASSWORD,
+  database: process.env.MYSQLDATABASE,
+  port: process.env.MYSQLPORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
+console.log('✅ Conexión a MySQL configurada correctamente');
+
+// ✅ Probar endpoint
+app.get('/api/test', async (req, res) => {
+  res.json({ status: 'ok', mysql: true });
+});
 
 // ========================
 // Middleware de autenticación JWT
