@@ -54,6 +54,16 @@ try {
   console.error("❌ Error conectando a MySQL:", error.message);
 }
 
+app.get("/api/test-jwt", (req, res) => {
+  try {
+    const token = jwt.sign({ test: true }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: "Error generando token", details: err.message });
+  }
+});
+
+
 // ---------------------
 // GOOGLE OAUTH CLIENT
 // ---------------------
