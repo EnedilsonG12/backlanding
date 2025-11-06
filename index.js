@@ -13,21 +13,16 @@ app.use(express.json());
 app.use(cors());
 
 // =========================
-// 🔧 Verificación
+// 🔧 Verificación de variables de entorno
 // =========================
 if (process.env.NODE_ENV !== 'production') {
-  const requiredEnv = [
-    'MYSQLHOST',
-    'MYSQLUSER',
-    'MYSQLPASSWORD',
-    'MYSQLDATABASE',
-    'JWT_TOKEN',
-    'PAYPAL_CLIENT_ID',
-    'PAYPAL_SECRET'
-  ];
-  requiredEnv.forEach((v) => {
-    if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
-  });
+const requiredEnv = [
+'MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE',
+'JWT_TOKEN', 'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET'
+];
+requiredEnv.forEach(v => {
+if (!process.env[v]) console.warn(⚠️ Falta la variable de entorno: ${v});
+});
 }
 
 // =========================
@@ -35,106 +30,106 @@ if (process.env.NODE_ENV !== 'production') {
 // =========================
 let pool;
 try {
-  pool = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  console.log('✅ Conexión a MySQL configurada correctamente');
+pool = mysql.createPool({
+host: process.env.MYSQLHOST,
+user: process.env.MYSQLUSER,
+password: process.env.MYSQLPASSWORD,
+database: process.env.MYSQLDATABASE,
+port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
+waitForConnections: true,
+connectionLimit: 10,
+queueLimit: 0
+});
+console.log('✅ Conexión a MySQL configurada correctamente');
 } catch (error) {
-  console.error('❌ Error al configurar conexión a MySQL:', error.message);
+console.error('❌ Error al configurar conexión a MySQL:', error.message);
 }
 
 // ========================
 // Middleware de autenticación JWT
 // ========================
 const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1]; // "Bearer <token>"
-  if (!token) return res.status(401).json({ message: "Token no proporcionado" });
+const token = req.headers.authorization?.split(" ")[1];
+if (!token) return res.status(401).json({ message: "Token no proporcionado" });
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    res.status(403).json({ message: "Token inválido" });
-  }
+try {
+const decoded = jwt.verify(token, process.env.JWT_TOKEN);
+req.user = decoded;
+next();
+} catch (err) {
+res.status(403).json({ message: "Token inválido" });
+}
 };
 
 // ========================
 // Rutas base
 // ========================
-app.get("/", (req, res) => {
-  res.send("Servidor backend Railway activo 🚀");
-});
-
-// =========================
-// 🧪 Ruta de prueba
-// =========================
 app.get("/api/test", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT 1 + 1 AS result");
-    res.json({ status: "ok", mysql: true, result: rows[0].result });
-  } catch (err) {
-    console.error("❌ Error de conexión MySQL:", err.message);
-    res.status(500).json({ status: "error", mysql: false });
-  }
+try {
+const [rows] = await pool.query("SELECT 1 + 1 AS result");
+res.json({ status: "ok", mysql: true, result: rows[0].result });
+} catch (err) {
+console.error("❌ Error de conexión MySQL:", err.message);
+res.status(500).json({ status: "error", mysql: false });
+}
 });
 
 // ========================
-// Login y Registro
+// Registro
+// ========================
+app.post("/api/register", async (req, res) => {
+try {
+const { username, email, password, role } = req.body;
+if (!username || !email || !password)
+return res.status(400).json({ error: "Todos los campos son requeridos" });
+
+const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);  
+if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });  
+
+const hashedPassword = await bcrypt.hash(password, 10);  
+const [result] = await pool.query(  
+  "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",  
+  [username, email, hashedPassword, role || "user"]  
+);  
+
+res.json({ id: result.insertId, username, role: role || "user" });  
+
+} catch (err) {
+console.error("❌ Error en registro:", err.message);
+res.status(500).json({ error: "Error al registrar usuario" });
+}
+});
+
+// ========================
+// Login
 // ========================
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body;
+const { email, password } = req.body;
 
-  try {
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (!rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+try {
+const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+if (!rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
 
-    const user = rows[0];
-    const passwordMatch = user.password ? await bcrypt.compare(password, user.password) : false;
-    if (!passwordMatch) return res.status(401).json({ message: "Contraseña incorrecta" });
+const user = rows[0];  
+const passwordMatch = user.password ? await bcrypt.compare(password, user.password) : false;  
+if (!passwordMatch) return res.status(401).json({ message: "Contraseña incorrecta" });  
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_TOKEN,
-      { expiresIn: "8h" }
-    );
+const token = jwt.sign(  
+  { id: user.id, email: user.email, role: user.role },  
+  process.env.JWT_TOKEN,  
+  { expiresIn: "8h" }  
+);  
 
-    res.json({ message: "Login exitoso", token });
-  } catch (error) {
-    console.error("Error en login:", error);
-    res.status(500).json({ message: "Error en el servidor" });
-  }
+res.json({ message: "Login exitoso", token });  
+
+} catch (error) {
+console.error("Error en login:", error);
+res.status(500).json({ message: "Error en el servidor" });
+}
 });
-
-app.post("/api/register", async (req, res) => {
-  try {
-    const { username, email, password, role } = req.body;
-    if (!username || !email || !password)
-      return res.status(400).json({ error: "Todos los campos son requeridos" });
-
-    const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
-      [username, email, hashedPassword, role || "user"]
-    );
-
-    res.json({ id: result.insertId, username, role: role || "user" });
-  } catch (err) {
-    console.error("❌ Error en registro:", err.message);
-    res.status(500).json({ error: "Error al registrar usuario" });
-  }
-});
-
+// ========================
+// Registro
+// ========================
 // ========================
 // Ruta protegida de prueba
 // ========================
