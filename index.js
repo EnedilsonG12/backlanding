@@ -1,74 +1,85 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import mysql from 'mysql2/promise';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import axios from 'axios';
-import { OAuth2Client } from 'google-auth-library';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import mysql from "mysql2/promise";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
+
 const app = express();
 
-// ---------------------
-// Middleware JSON y CORS
-// ---------------------
+// ========================
+// Middleware base
+// ========================
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors({
+  origin: process.env.CLIENT_URL || "*",
+  credentials: true,
+}));
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || process.env.FRONTEND_URL || '*',
-    credentials: true,
-  })
-);
-
-// ---------------------
+// ========================
 // Validar variables requeridas
-// ---------------------
-const requiredEnv = [
-  'MYSQLHOST',
-  'MYSQLUSER',
-  'MYSQLPASSWORD',
-  'MYSQLDATABASE',
-  'MYSQLPORT',
-  'JWT_TOKEN', // ← aquí se usa tu variable real
-];
+// ========================
+const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE", "JWT_TOKEN"];
+for (const v of requiredEnv) {
+  if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
+}
 
-requiredEnv.forEach((key) => {
-  if (!process.env[key]) {
-    console.warn(`⚠️  Falta la variable de entorno: ${key}`);
-  }
-});
-
-// ---------------------
+// ========================
 // Conexión a MySQL
-// ---------------------
-let connection;
+// ========================
+let pool;
+try {
+  pool = mysql.createPool({
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
+    port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  });
 
-const connectDB = async () => {
+  console.log("✅ Conexión a MySQL configurada correctamente");
+} catch (error) {
+  console.error("❌ Error al configurar MySQL:", error.message);
+}
+
+// ========================
+// Middleware de autenticación JWT
+// ========================
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1]; // "Bearer <token>"
+  if (!token) return res.status(401).json({ message: "Token no proporcionado" });
+
   try {
-    connection = await mysql.createConnection({
-      host: process.env.MYSQLHOST,
-      user: process.env.MYSQLUSER,
-      password: process.env.MYSQLPASSWORD,
-      database: process.env.MYSQLDATABASE,
-      port: process.env.MYSQLPORT || 3306,
-    });
-    console.log('✅ Conexión a MySQL exitosa');
-  } catch (error) {
-    console.error('❌ Error al conectar a MySQL:', error.message);
-    process.exit(1);
+    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(403).json({ message: "Token inválido" });
   }
 };
-connectDB();
 
-// ---------------------
-// Ruta de prueba
-// ---------------------
-app.get('/', (req, res) => {
-  res.json({ message: '🚀 Servidor funcionando correctamente' });
+// ========================
+// Rutas de prueba
+// ========================
+app.get("/api/test", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT 1 + 1 AS result");
+    res.json({ status: "ok", mysql: true, result: rows[0].result });
+  } catch (err) {
+    console.error("❌ Error de conexión MySQL:", err.message);
+    res.status(500).json({ status: "error", mysql: false });
+  }
 });
+
+app.get("/api/protegido", authMiddleware, (req, res) => {
+  res.json({ message: "Acceso permitido", user: req.user });
+});
+
 
 // ---------------------
 // Ruta de login (ejemplo)
