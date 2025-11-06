@@ -1,27 +1,45 @@
-import express from 'express';
-import cors from 'cors';
-import mysql from 'mysql2/promise';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import express from "express";
+import cors from "cors";
+import mysql from "mysql2/promise";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import axios from "axios";
+import { OAuth2Client } from "google-auth-library";
+import dotenv from "dotenv";
 
-// Solo carga dotenv si estás en local
-import dotenv from 'dotenv';
-if (process.env.NODE_ENV !== 'production') {
+// Cargar dotenv solo en entorno local
+if (process.env.NODE_ENV !== "production") {
   dotenv.config();
 }
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Validar variables críticas
-const requiredEnv = ['MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE', 'JWT_SECRET'];
+// ---------------------
+// Middleware
+// ---------------------
+app.use(cors());
+app.use(express.json());
+
+// ---------------------
+// Validar variables de entorno
+// ---------------------
+const requiredEnv = [
+  "MYSQLHOST",
+  "MYSQLUSER",
+  "MYSQLPASSWORD",
+  "MYSQLDATABASE",
+  "JWT_SECRET",
+];
 requiredEnv.forEach((key) => {
   if (!process.env[key]) {
     console.warn(`⚠️ Falta la variable: ${key}`);
   }
 });
 
-// Conexión a MySQL (pool)
+// ---------------------
+// Conexión MySQL (pool)
+// ---------------------
 const pool = mysql.createPool({
   host: process.env.MYSQLHOST,
   user: process.env.MYSQLUSER,
@@ -29,26 +47,32 @@ const pool = mysql.createPool({
   database: process.env.MYSQLDATABASE,
   port: process.env.MYSQLPORT || 3306,
   ssl: {
-    rejectUnauthorized: false, // Necesario en Railway
+    rejectUnauthorized: false, // Necesario para Railway
   },
 });
 
-app.use(cors());
-app.use(express.json());
+// ---------------------
+// Ruta de prueba base
+// ---------------------
+app.get("/", (req, res) => {
+  res.send("🚀 Backend activo en Railway");
+});
 
-// Ruta de prueba
-app.get('/api/test', async (req, res) => {
+// ---------------------
+// Test conexión MySQL
+// ---------------------
+app.get("/api/test", async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT 1');
-    res.json({ status: 'ok', mysql: true });
+    const [rows] = await pool.query("SELECT 1");
+    res.json({ status: "ok", mysql: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ status: 'error', mysql: false });
+    console.error("❌ Error conexión MySQL:", err.message);
+    res.status(500).json({ status: "error", mysql: false });
   }
 });
 
 // ---------------------
-// GOOGLE OAUTH CLIENT
+// Google OAuth Client
 // ---------------------
 let googleClient = null;
 if (process.env.GOOGLE_CLIENT_ID) {
@@ -56,7 +80,7 @@ if (process.env.GOOGLE_CLIENT_ID) {
 }
 
 // ---------------------
-// MIDDLEWARE JWT
+// Middleware JWT
 // ---------------------
 const authMiddleware = (req, res, next) => {
   const header = req.headers.authorization;
@@ -71,27 +95,25 @@ const authMiddleware = (req, res, next) => {
 };
 
 // ---------------------
-// RUTAS DE PRUEBA
-// ---------------------
-app.get("/", (req, res) => res.send("🚀 Backend activo en Railway"));
-app.get("/api/test", (req, res) => res.json({ status: "ok", mysql: !!pool }));
-
-// ---------------------
-// LOGIN DE PRUEBA
+// LOGIN
 // ---------------------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
     if (!rows.length) return res.status(404).json({ error: "Usuario no encontrado" });
 
     const user = rows[0];
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
 
     res.json({ message: "Login exitoso", token });
   } catch (err) {
@@ -106,12 +128,14 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
-
     if (!username || !email || !password)
       return res.status(400).json({ error: "Todos los campos son requeridos" });
 
-    const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });
+    const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
+    if (existing.length)
+      return res.status(400).json({ error: "Usuario ya registrado" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
@@ -121,7 +145,7 @@ app.post("/api/register", async (req, res) => {
 
     res.json({ id: result.insertId, username, role: role || "user" });
   } catch (err) {
-    console.error("Error en registro:", err.message);
+    console.error("❌ Error en registro:", err.message);
     res.status(500).json({ error: "Error al registrar usuario" });
   }
 });
@@ -144,7 +168,9 @@ app.post("/api/google-login", async (req, res) => {
     const email = payload.email;
     const username = payload.name || email.split("@")[0];
 
-    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [
+      email,
+    ]);
     let user;
 
     if (!rows.length) {
