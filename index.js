@@ -59,7 +59,7 @@ app.get("/", (req, res) => {
 });
 
 // ---------------------
-// Test conexión MySQL
+//conexión MySQL
 // ---------------------
 app.get("/api/test", async (req, res) => {
   try {
@@ -198,7 +198,6 @@ app.post("/api/google-login", async (req, res) => {
 // ---------------------
 // Usuarios
 // ---------------------
-
 app.get('/api/users', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, username, email, role FROM users');
