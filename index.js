@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(cors());
 
 // =========================
-// 🔧 Verificación de entorno
+// 🔧 Verificación
 // =========================
 if (process.env.NODE_ENV !== 'production') {
   const requiredEnv = [
