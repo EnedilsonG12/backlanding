@@ -17,52 +17,46 @@ app.use(express.json());
 app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
 
 // ---------------------
-// LIMPIAR JWT_SECRET (para evitar comillas de Railway)
+// LIMPIAR VARIABLES .ENV (por si Railway agrega comillas)
 // ---------------------
-if (process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = process.env.JWT_SECRET.replace(/^['"]|['"]$/g, "").trim();
-  console.log("🔐 JWT_SECRET cargado correctamente:", process.env.JWT_SECRET ? "Sí" : "No");
-} else {
-  console.warn("⚠️ Advertencia: JWT_SECRET no está definido");
+for (const key in process.env) {
+  if (typeof process.env[key] === "string") {
+    process.env[key] = process.env[key].replace(/^['"]|['"]$/g, "").trim();
+  }
 }
 
 // ---------------------
-// VALIDACIÓN DE VARIABLES .ENV
+// VALIDACIÓN DE VARIABLES
 // ---------------------
 const requiredEnv = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE"];
-for (const key of requiredEnv) {
-  if (!process.env[key]) console.warn(`⚠️ Advertencia: La variable ${key} no está definida.`);
-}
-
-// ---------------------
-// CONEXIÓN MYSQL
-// ---------------------
-let pool;
-try {
-  pool = await mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-  console.log("✅ Conectado a MySQL correctamente.");
-} catch (error) {
-  console.error("❌ Error conectando a MySQL:", error.message);
-}
-
-app.get("/api/test-jwt", (req, res) => {
-  try {
-    const token = jwt.sign({ test: true }, process.env.JWT_SECRET, { expiresIn: "1h" });
-    res.json({ token });
-  } catch (err) {
-    res.status(500).json({ error: "Error generando token", details: err.message });
-  }
+requiredEnv.forEach((key) => {
+  if (!process.env[key]) console.warn(`⚠️ Falta la variable: ${key}`);
 });
 
+// ---------------------
+// CONEXIÓN MYSQL (con reintento)
+// ---------------------
+let pool;
+const connectDB = async () => {
+  try {
+    pool = await mysql.createPool({
+      host: process.env.MYSQLHOST,
+      user: process.env.MYSQLUSER,
+      password: process.env.MYSQLPASSWORD,
+      database: process.env.MYSQLDATABASE,
+      port: process.env.MYSQLPORT ? Number(process.env.MYSQLPORT) : 3306,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+    await pool.query("SELECT 1");
+    console.log("✅ Conectado a MySQL correctamente.");
+  } catch (error) {
+    console.error("❌ Error conectando a MySQL, reintentando en 3s:", error.message);
+    setTimeout(connectDB, 3000);
+  }
+};
+connectDB();
 
 // ---------------------
 // GOOGLE OAUTH CLIENT
@@ -76,56 +70,44 @@ if (process.env.GOOGLE_CLIENT_ID) {
 // MIDDLEWARE JWT
 // ---------------------
 const authMiddleware = (req, res, next) => {
-  try {
-    const header = req.headers.authorization;
-    if (!header) return res.status(401).json({ error: "Falta el encabezado Authorization" });
+  const header = req.headers.authorization;
+  if (!header) return res.status(401).json({ error: "Falta el token" });
 
-    const token = header.startsWith("Bearer ") ? header.split(" ")[1] : header;
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-      if (err) {
-        console.error("❌ JWT error:", err.message);
-        return res.status(403).json({ error: "Token inválido o expirado" });
-      }
-      req.user = decoded;
-      next();
-    });
-  } catch (err) {
-    console.error("❌ Error en middleware JWT:", err.message);
-    res.status(500).json({ error: "Error procesando token" });
-  }
+  const token = header.startsWith("Bearer ") ? header.split(" ")[1] : header;
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ error: "Token inválido o expirado" });
+    req.user = decoded;
+    next();
+  });
 };
 
 // ---------------------
-// LOGIN
+// RUTAS DE PRUEBA
+// ---------------------
+app.get("/", (req, res) => res.send("🚀 Backend activo en Railway"));
+app.get("/api/test", (req, res) => res.json({ status: "ok", mysql: !!pool }));
+
+// ---------------------
+// LOGIN DE PRUEBA
 // ---------------------
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ error: "Email y contraseña son requeridos" });
-
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (!rows.length) return res.status(401).json({ error: "Usuario no encontrado" });
+    if (!rows.length) return res.status(404).json({ error: "Usuario no encontrado" });
 
     const user = rows[0];
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) return res.status(401).json({ error: "Contraseña incorrecta" });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: "Contraseña incorrecta" });
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-
-    res.json({
-      message: "Inicio de sesión exitoso",
-      token,
-      role: user.role,
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, {
+      expiresIn: "24h",
     });
+
+    res.json({ message: "Login exitoso", token });
   } catch (err) {
     console.error("❌ Error en login:", err.message);
-    res.status(500).json({ error: "Error interno del servidor" });
+    res.status(500).json({ error: "Error en el servidor" });
   }
 });
 
