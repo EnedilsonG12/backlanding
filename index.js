@@ -13,41 +13,52 @@ app.use(express.json());
 app.use(cors());
 
 // =========================
-// 🔧 Verificación de variables de entorno
+// ✅ Verificación de variables de entorno
 // =========================
-if (process.env.NODE_ENV !== 'production') {
-  const requiredEnv = [
-    'MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE',
-    'JWT_TOKEN', 'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET'
-  ];
-  requiredEnv.forEach(v => {
-    if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
-  });
-}
+const requiredEnv = [
+  'MYSQLHOST',
+  'MYSQLUSER',
+  'MYSQLPASSWORD',
+  'MYSQLDATABASE',
+  'MYSQLPORT',
+  'JWT_TOKEN'
+];
+
+requiredEnv.forEach((v) => {
+  if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
+});
 
 // =========================
-// 💾 Conexión a MySQL
+// 💾 Conexión a MySQL (Railway)
 // =========================
 let pool;
-try {
-  pool = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  console.log('✅ Conexión a MySQL configurada correctamente');
-} catch (error) {
-  console.error('❌ Error al configurar conexión a MySQL:', error.message);
-  process.exit(1);
-}
+
+(async () => {
+  try {
+    pool = mysql.createPool({
+      host: process.env.MYSQLHOST,
+      user: process.env.MYSQLUSER,
+      password: process.env.MYSQLPASSWORD,
+      database: process.env.MYSQLDATABASE,
+      port: parseInt(process.env.MYSQLPORT) || 3306,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      ssl: {
+        rejectUnauthorized: true, // Requerido por Railway
+      },
+    });
+
+    const [test] = await pool.query('SELECT 1+1 AS result');
+    console.log(`✅ Conexión exitosa a MySQL (resultado: ${test[0].result})`);
+  } catch (error) {
+    console.error('❌ Error al conectar con MySQL:', error.message);
+    process.exit(1);
+  }
+})();
 
 // ========================
-// Middleware de autenticación JWT
+// 🔐 Middleware JWT
 // ========================
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
@@ -62,17 +73,31 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// ========================
-// Rutas base
-// ========================
+// =========================
+// 🚀 Ruta de prueba de conexión
+// =========================
 app.get("/api/test", async (req, res) => {
-try {
-const [rows] = await pool.query("SELECT 1 + 1 AS result");
-res.json({ status: "ok", mysql: true, result: rows[0].result });
-} catch (err) {
-console.error("❌ Error de conexión MySQL:", err.message);
-res.status(500).json({ status: "error", mysql: false });
-}
+  try {
+    const [rows] = await pool.query("SELECT NOW() AS now");
+    res.json({ status: "ok", mysql: true, serverTime: rows[0].now });
+  } catch (err) {
+    console.error("❌ Error de conexión MySQL:", err.message);
+    res.status(500).json({ status: "error", mysql: false });
+  }
+});
+
+// =========================
+// 🧠 Ruta de diagnóstico
+// =========================
+app.get("/api/env", (req, res) => {
+  res.json({
+    MYSQLHOST: process.env.MYSQLHOST || null,
+    MYSQLUSER: process.env.MYSQLUSER || null,
+    MYSQLDATABASE: process.env.MYSQLDATABASE || null,
+    MYSQLPORT: process.env.MYSQLPORT || null,
+    JWT_TOKEN: !!process.env.JWT_TOKEN,
+    NODE_ENV: process.env.NODE_ENV || "development",
+  });
 });
 
 // ========================
