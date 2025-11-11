@@ -35,7 +35,7 @@ const pool = mysql.createPool({
     ? "mysql.railway.internal"
     : process.env.MYSQLHOST?.trim() || "gondola.proxy.rlwy.net",
   user: process.env.MYSQLUSER?.trim() || "root",
-  password: process.env.MYSQLPASSWORD?.trim(),
+  password: process.env.MYSQLPASSWORD?.trim()|| "kwrCArKHTGJPtFZRakGHeixXEhfMviBC",
   database: process.env.MYSQLDATABASE?.trim() || "railway",
   port: isRailway
     ? 3306
