@@ -16,13 +16,13 @@ app.use(cors());
 // 🔧 Verificación de variables de entorno
 // =========================
 if (process.env.NODE_ENV !== 'production') {
-const requiredEnv = [
-'MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE',
-'JWT_TOKEN', 'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET'
-];
-requiredEnv.forEach(v => {
-if (!process.env[v]) console.warn("⚠️ Falta la variable de entorno: ${v}");
-});
+  const requiredEnv = [
+    'MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE',
+    'JWT_TOKEN', 'PAYPAL_CLIENT_ID', 'PAYPAL_SECRET'
+  ];
+  requiredEnv.forEach(v => {
+    if (!process.env[v]) console.warn(`⚠️ Falta la variable de entorno: ${v}`);
+  });
 }
 
 // =========================
@@ -30,35 +30,36 @@ if (!process.env[v]) console.warn("⚠️ Falta la variable de entorno: ${v}");
 // =========================
 let pool;
 try {
-pool = mysql.createPool({
-host: process.env.MYSQLHOST,
-user: process.env.MYSQLUSER,
-password: process.env.MYSQLPASSWORD,
-database: process.env.MYSQLDATABASE,
-port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
-waitForConnections: true,
-connectionLimit: 10,
-queueLimit: 0
-});
-console.log('✅ Conexión a MySQL configurada correctamente');
+  pool = mysql.createPool({
+    host: process.env.MYSQLHOST,
+    user: process.env.MYSQLUSER,
+    password: process.env.MYSQLPASSWORD,
+    database: process.env.MYSQLDATABASE,
+    port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  });
+  console.log('✅ Conexión a MySQL configurada correctamente');
 } catch (error) {
-console.error('❌ Error al configurar conexión a MySQL:', error.message);
+  console.error('❌ Error al configurar conexión a MySQL:', error.message);
+  process.exit(1);
 }
 
 // ========================
 // Middleware de autenticación JWT
 // ========================
 const authMiddleware = (req, res, next) => {
-const token = req.headers.authorization?.split(" ")[1];
-if (!token) return res.status(401).json({ message: "Token no proporcionado" });
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Token no proporcionado" });
 
-try {
-const decoded = jwt.verify(token, process.env.JWT_TOKEN);
-req.user = decoded;
-next();
-} catch (err) {
-res.status(403).json({ message: "Token inválido" });
-}
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_TOKEN);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(403).json({ message: "Token inválido" });
+  }
 };
 
 // ========================
