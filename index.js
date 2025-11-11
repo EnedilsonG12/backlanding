@@ -28,18 +28,24 @@ if (process.env.NODE_ENV !== 'production') {
 // =========================
 // 💾 Conexión a MySQL
 // =========================
+const isRailway = process.env.RAILWAY_ENVIRONMENT_NAME !== undefined;
+
 const pool = mysql.createPool({
-  host: process.env.MYSQLHOST?.trim() || "mysql.railway.internal",
+  host: isRailway
+    ? "mysql.railway.internal"
+    : process.env.MYSQLHOST?.trim() || "gondola.proxy.rlwy.net",
   user: process.env.MYSQLUSER?.trim() || "root",
   password: process.env.MYSQLPASSWORD?.trim(),
   database: process.env.MYSQLDATABASE?.trim() || "railway",
-  port: parseInt(process.env.MYSQLPORT?.trim()) || 14733,
+  port: isRailway
+    ? 3306
+    : parseInt(process.env.MYSQLPORT?.trim()) || 14733,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: {
-    rejectUnauthorized: true,
-  },
+  ssl: isRailway
+    ? undefined // 🚀 En Railway no se usa SSL
+    : { rejectUnauthorized: false }, // 🔒 Desde local sí
 });
 
 // ========================
