@@ -28,23 +28,19 @@ if (process.env.NODE_ENV !== 'production') {
 // =========================
 // 💾 Conexión a MySQL
 // =========================
-let pool;
-try {
-  pool = mysql.createPool({
-    host: process.env.MYSQLHOST,
-    user: process.env.MYSQLUSER,
-    password: process.env.MYSQLPASSWORD,
-    database: process.env.MYSQLDATABASE,
-    port: process.env.MYSQLPORT ? parseInt(process.env.MYSQLPORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  console.log('✅ Conexión a MySQL configurada correctamente');
-} catch (error) {
-  console.error('❌ Error al configurar conexión a MySQL:', error.message);
-  process.exit(1);
-}
+const pool = mysql.createPool({
+  host: process.env.MYSQLHOST?.trim() || "mysql.railway.internal",
+  user: process.env.MYSQLUSER?.trim() || "root",
+  password: process.env.MYSQLPASSWORD?.trim(),
+  database: process.env.MYSQLDATABASE?.trim() || "railway",
+  port: parseInt(process.env.MYSQLPORT?.trim()) || 14733,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: {
+    rejectUnauthorized: true, // Railway exige SSL
+  },
+});
 
 // ========================
 // Middleware de autenticación JWT
