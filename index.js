@@ -48,6 +48,84 @@ const pool = mysql.createPool({
     : { rejectUnauthorized: false }, // 🔒 Desde local sí
 });
 
+// =========================
+// 🧱 Creación de tablas si no existen
+// =========================
+const createTables = async () => {
+  const tables = [
+    `
+    CREATE TABLE IF NOT EXISTS categorias (
+      id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+      nombre_categoria VARCHAR(100) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NULL,
+      price_cents DECIMAL(10,2) NOT NULL,
+      stock INT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'Activo',
+      image_url VARCHAR(255) NULL,
+      id_categoria INT NULL,
+      discount TINYINT NULL,
+      discount_expiration DATETIME NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_products_categoria FOREIGN KEY (id_categoria)
+        REFERENCES categorias(id_categoria)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NULL,
+      email VARCHAR(255) NULL,
+      address_line VARCHAR(255) NULL,
+      city VARCHAR(100) NULL,
+      country VARCHAR(100) NULL,
+      total_cents INT NOT NULL,
+      payment_intent_id VARCHAR(255) NULL,
+      status ENUM('pending','completed','cancelled') DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_id INT NOT NULL,
+      product_id INT NOT NULL,
+      quantity INT NOT NULL,
+      unit_price_cents INT NOT NULL,
+      line_total_cents INT NOT NULL,
+      CONSTRAINT fk_orderitems_order FOREIGN KEY (order_id)
+        REFERENCES orders(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+      CONSTRAINT fk_orderitems_product FOREIGN KEY (product_id)
+        REFERENCES products(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `
+  ];
+
+  try {
+    for (const sql of tables) {
+      await pool.promise().query(sql);
+    }
+    console.log("✅ Tablas verificadas/creadas correctamente");
+  } catch (err) {
+    console.error("❌ Error al crear tablas:", err);
+  }
+};
+
+// Ejecutar al iniciar el servidor
+createTables();
+
+
 // ========================
 // Middleware de autenticación JWT
 // ========================
