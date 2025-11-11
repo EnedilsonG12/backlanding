@@ -47,7 +47,6 @@ const pool = mysql.createPool({
     ? undefined // 🚀 En Railway no se usa SSL
     : { rejectUnauthorized: false }, // 🔒 Desde local sí
 });
-
 // =========================
 // 🧱 Creación de tablas si no existen
 // =========================
@@ -114,7 +113,7 @@ const createTables = async () => {
 
   try {
     for (const sql of tables) {
-      await pool.promise().query(sql);
+      await pool.query(sql); // ✅ corregido: sin .promise()
     }
     console.log("✅ Tablas verificadas/creadas correctamente");
   } catch (err) {
@@ -123,7 +122,7 @@ const createTables = async () => {
 };
 
 // Ejecutar al iniciar el servidor
-createTables();
+await createTables();
 
 
 // ========================
