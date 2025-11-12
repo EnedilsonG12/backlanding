@@ -48,6 +48,27 @@ const pool = mysql.createPool({
     : { rejectUnauthorized: false }, // 🔒 Desde local sí
 });
 
+// =========================
+// 🧩 Corrección de columna en products
+// =========================
+(async () => {
+  try {
+    const [columns] = await pool.query(`SHOW COLUMNS FROM products LIKE 'price_cents';`);
+    if (columns.length > 0) {
+      await pool.query(`
+        ALTER TABLE products 
+        CHANGE COLUMN price_cents price DECIMAL(10,2) NOT NULL;
+      `);
+      console.log("✅ Columna 'price_cents' renombrada a 'price' correctamente.");
+    } else {
+      console.log("ℹ️ La columna 'price_cents' ya fue renombrada o no existe.");
+    }
+  } catch (err) {
+    console.error("❌ Error al renombrar columna 'price_cents':", err.message);
+  }
+})();
+
+
 // ========================
 // Middleware de autenticación JWT
 // ========================
