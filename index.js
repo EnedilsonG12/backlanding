@@ -81,27 +81,36 @@ res.status(500).json({ status: "error", mysql: false });
 // Registro
 // ========================
 app.post("/api/register", async (req, res) => {
-try {
-const { username, email, password, role } = req.body;
-if (!username || !email || !password)
-return res.status(400).json({ error: "Todos los campos son requeridos" });
+  try {
+    const { username, email, password } = req.body;
+    if (!username || !email || !password)
+      return res.status(400).json({ error: "Todos los campos son requeridos" });
 
-const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);  
-if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });  
+    // Verificar si ya existe un usuario con ese email
+    const [existing] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (existing.length) return res.status(400).json({ error: "Usuario ya registrado" });
 
-const hashedPassword = await bcrypt.hash(password, 10);  
-const [result] = await pool.query(  
-  "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",  
-  [username, email, hashedPassword, role || "user"]  
-);  
+    // Verificar si ya existe algún usuario en la tabla
+    const [users] = await pool.query("SELECT COUNT(*) AS total FROM users");
+    const isFirstUser = users[0].total === 0;
 
-res.json({ id: result.insertId, username, role: role || "user" });  
+    // Si es el primer usuario → rol admin, si no → rol user
+    const role = isFirstUser ? "admin" : "user";
 
-} catch (err) {
-console.error("❌ Error en registro:", err.message);
-res.status(500).json({ error: "Error al registrar usuario" });
-}
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
+      [username, email, hashedPassword, role]
+    );
+
+    res.json({ id: result.insertId, username, role });
+
+  } catch (err) {
+    console.error("❌ Error en registro:", err.message);
+    res.status(500).json({ error: "Error al registrar usuario" });
+  }
 });
+
 
 // ========================
 // Login
